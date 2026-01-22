@@ -23,7 +23,7 @@ class Ui_Form(object):
         self.lbl_logo.setGeometry(QtCore.QRect(10, 10, 171, 81))
         font = QtGui.QFont(); font.setFamily("Jersey Sharp"); font.setPointSize(24)
         self.lbl_logo.setFont(font)
-        self.lbl_logo.setObjectName("lbl_logo")
+        self.lbl_logo.setObjectName("Milky Nice")
 
         # Tombol Navigasi
         self.btn_dashboard = QtWidgets.QPushButton(self.frame_header)

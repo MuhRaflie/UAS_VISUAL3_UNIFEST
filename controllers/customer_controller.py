@@ -6,7 +6,7 @@ from db import get_connection
 MODE_INSERT = "insert"
 MODE_EDIT = "edit"
 
-class CustomerWindow(QtWidgets.QWidget):
+class CustomerController(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.ui = Ui_Form()

@@ -1,13 +1,10 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from customer import CustomerWindow
+from controllers.dashboard_controller import DashboardController
 
 if __name__ == "__main__":
     print("APP START")
     app = QApplication(sys.argv)
-
-    window = CustomerWindow()
+    window = DashboardController()
     window.show()
-
-    print("WINDOW SHOWN")
-    sys.exit(app.exec())
+    sys.exit(app.exec_())
