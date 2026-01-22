@@ -20,6 +20,11 @@ class ProdukController(QtWidgets.QWidget):
         self.load_supplier()
         self.load_produk()
 
+        # --- PERBAIKAN LAYOUT ---
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.ui.frame_2)
+        layout.setContentsMargins(0, 0, 0, 0)
+
         # Button events
         self.ui.btn_Simpan.clicked.connect(self.insert_produk)
         self.ui.btn_Edit.clicked.connect(self.update_produk)

@@ -1,5 +1,8 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QMessageBox
+from controllers.pembelian_controller import PembelianController
+from controllers.penjualan_controller import PenjualanController
+import db
 from form.form_customer import Ui_Form
 from db import get_connection
 
@@ -11,13 +14,15 @@ class CustomerController(QtWidgets.QWidget):
         super().__init__()
         self.ui = Ui_Form()
         self.ui.setupUi(self)
-
+        self.db = db
+        
         self.mode = MODE_INSERT
         self.selected_id = None
 
         self.set_mode(MODE_INSERT)
         self.load_customer()
-
+        self.ui.btn_penjualan.clicked.connect(self.open_penjualan)
+        self.ui.btn_pembelian.clicked.connect(self.open_pembelian)
         self.ui.btn_Simpan_2.clicked.connect(self.insert_customer)
         self.ui.btn_Edit_2.clicked.connect(self.update_customer)
         self.ui.btn_Hapus_2.clicked.connect(self.delete_customer)
@@ -150,3 +155,14 @@ class CustomerController(QtWidgets.QWidget):
         self.ui.input_alamat.clear()
         self.ui.tableWidget.clearSelection()
         self.set_mode(MODE_INSERT)
+
+    def open_penjualan(self):
+        print("OPEN PENJUALAN")
+        # Sekarang self.db sudah ada dan tidak akan error lagi
+        self.form = PenjualanController(self.db)
+        self.form.show()
+
+    def open_pembelian(self):
+        print("OPEN PEMBELIAN")
+        self.form = PembelianController(self.db)
+        self.form.show()

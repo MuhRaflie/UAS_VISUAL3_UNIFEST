@@ -57,4 +57,3 @@ class DashboardController(QMainWindow):
         self.form.show()
 
 
-
