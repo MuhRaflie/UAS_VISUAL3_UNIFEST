@@ -3,94 +3,113 @@ from form.form_pembelian import Ui_Form
 from models.produk_model import ProdukModel
 import datetime
 
+
 class PembelianController(QWidget):
     def __init__(self, db):
         super().__init__()
+
+        # Setup UI
         self.ui = Ui_Form()
         self.ui.setupUi(self)
+
+        # Database & Model
         self.db = db
         self.produk_model = ProdukModel(db)
-        self.cart = [] # (id_produk, nama, harga_beli, qty, subtotal)
-        self.ui.combo_produk.currentIndexChanged.connect(self.set_harga_otomatis)
-        self.ui.input_jumlah.valueChanged.connect(self.hitung_subtotal)
-        self.ui.input_harga_beli.setReadOnly(True)
-        self.ui.input_subtotal.setReadOnly(True)
-        # Load Data
-        self.load_supplier()
-        self.load_produk()
-        
-        # Set tanggal default ke hari ini
+
+        # Cart: (id_produk, nama, harga_beli, qty, subtotal)
+        self.cart = []
+
+        # Set default tanggal hari ini
         self.ui.input_tanggal.setDateTime(datetime.datetime.now())
 
-        # Connect Events
+        # Disable input otomatis
+        self.ui.input_harga_beli.setReadOnly(True)
+        self.ui.input_subtotal.setReadOnly(True)
+
+        # Load data awal
+        self.load_supplier()
+        self.load_produk()
+
+        # Event binding
+        self.bind_event()
+
+    # ================= EVENT =================
+    def bind_event(self):
+        self.ui.combo_produk.currentIndexChanged.connect(self.set_harga_otomatis)
+        self.ui.input_jumlah.valueChanged.connect(self.hitung_subtotal)
+
         self.ui.btn_tambah_item.clicked.connect(self.tambah_item)
         self.ui.btn_hapus_item.clicked.connect(self.hapus_item)
         self.ui.btn_reset_item.clicked.connect(self.reset_cart)
-        self.ui.btn_menu_3.clicked.connect(self.simpan_pembelian) # Tombol Simpan
+        self.ui.btn_menu_3.clicked.connect(self.simpan_pembelian)
 
+    # ================= LOAD DATA =================
     def load_supplier(self):
         try:
             cursor = self.db.cursor()
             cursor.execute("SELECT id_supplier, nama_supplier FROM supplier")
             data = cursor.fetchall()
+
             self.ui.combo_supplier.clear()
             for row in data:
-                self.ui.combo_supplier.addItem(row[1], row[0]) # Text=Nama, Data=ID
+                self.ui.combo_supplier.addItem(row[1], row[0])
+
         except Exception as e:
-            print(f"Error load supplier: {e}")
+            QMessageBox.critical(self, "Error", f"Gagal load supplier\n{e}")
 
     def load_produk(self):
         try:
             cursor = self.db.cursor()
             cursor.execute("SELECT id_produk, nama_produk, harga_beli FROM produk")
             data = cursor.fetchall()
+
             self.ui.combo_produk.clear()
             for row in data:
-                # Simpan (id, nama, harga_beli_terakhir)
-                self.ui.combo_produk.addItem(f"{row[1]}", row)
-        except Exception as e:
-            print(f"Error load produk: {e}")
+                # Data combo: (id_produk, nama, harga_beli)
+                self.ui.combo_produk.addItem(row[1], row)
 
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Gagal load produk\n{e}")
+
+    # ================= INPUT LOGIC =================
     def set_harga_otomatis(self):
-        produk_data = self.ui.combo_produk.currentData()
-        if produk_data:
-            harga_beli = produk_data[2]  # dari SELECT id, nama, harga_beli
-            self.ui.input_harga_beli.setText(str(harga_beli))
+        produk = self.ui.combo_produk.currentData()
+        if produk:
+            self.ui.input_harga_beli.setText(str(produk[2]))
             self.hitung_subtotal()
 
-    def tambah_item(self):
+    def hitung_subtotal(self):
         try:
-            produk_data = self.ui.combo_produk.currentData() # (id, nama, harga_beli_lama)
-            if not produk_data:
-                return
+            harga = int(self.ui.input_harga_beli.text() or 0)
+            qty = self.ui.input_jumlah.value()
+            self.ui.input_subtotal.setText(str(harga * qty))
+        except ValueError:
+            self.ui.input_subtotal.setText("0")
 
-            id_produk = produk_data[0]
-            nama_produk = produk_data[1]
-            
-            # Ambil inputan manual user
-            try:
-                harga_beli = int(self.ui.input_harga_beli.text())
-                qty = self.ui.input_jumlah.value()
-            except ValueError:
-                QMessageBox.warning(self, "Validasi", "Harga harus angka")
-                return
+    # ================= CART =================
+    def tambah_item(self):
+        produk = self.ui.combo_produk.currentData()
+        if not produk:
+            return
 
-            if qty <= 0:
-                QMessageBox.warning(self, "Validasi", "Jumlah harus > 0")
-                return
+        id_produk, nama_produk, _ = produk
 
-            subtotal = harga_beli * qty
+        try:
+            harga_beli = int(self.ui.input_harga_beli.text())
+            qty = self.ui.input_jumlah.value()
+        except ValueError:
+            QMessageBox.warning(self, "Validasi", "Harga tidak valid")
+            return
 
-            # Tambahkan ke cart
-            self.cart.append((id_produk, nama_produk, harga_beli, qty, subtotal))
-            self.refresh_table()
-            
-            # Reset input
-            self.ui.input_jumlah.setValue(0)
-            self.ui.input_harga_beli.clear()
+        if qty <= 0:
+            QMessageBox.warning(self, "Validasi", "Jumlah harus lebih dari 0")
+            return
 
-        except Exception as e:
-            print(f"Error tambah item pembelian: {e}")
+        subtotal = harga_beli * qty
+        self.cart.append((id_produk, nama_produk, harga_beli, qty, subtotal))
+
+        self.refresh_table()
+        self.ui.input_jumlah.setValue(0)
 
     def hapus_item(self):
         row = self.ui.table_detail_pembelian.currentRow()
@@ -101,22 +120,23 @@ class PembelianController(QWidget):
     def reset_cart(self):
         self.cart.clear()
         self.refresh_table()
+        self.ui.lineEdit.clear()
 
     def refresh_table(self):
         self.ui.table_detail_pembelian.setRowCount(len(self.cart))
-        total_transaksi = 0
-        
+        total = 0
+
         for row, item in enumerate(self.cart):
-            # item: (id_produk, nama, harga, qty, subtotal)
             self.ui.table_detail_pembelian.setItem(row, 0, QTableWidgetItem(str(item[0])))
             self.ui.table_detail_pembelian.setItem(row, 1, QTableWidgetItem(item[1]))
             self.ui.table_detail_pembelian.setItem(row, 2, QTableWidgetItem(str(item[2])))
             self.ui.table_detail_pembelian.setItem(row, 3, QTableWidgetItem(str(item[3])))
             self.ui.table_detail_pembelian.setItem(row, 4, QTableWidgetItem(str(item[4])))
-            total_transaksi += item[4]
+            total += item[4]
 
-        self.ui.lineEdit.setText(f"Rp {total_transaksi:,.0f}")
+        self.ui.lineEdit.setText(f"Rp {total:,.0f}")
 
+    # ================= SAVE =================
     def simpan_pembelian(self):
         if not self.cart:
             QMessageBox.warning(self, "Peringatan", "Data pembelian kosong")
@@ -125,49 +145,37 @@ class PembelianController(QWidget):
         try:
             id_supplier = self.ui.combo_supplier.currentData()
             tanggal = self.ui.input_tanggal.dateTime().toPyDateTime()
-            # ID User admin hardcode sementara atau ambil dari login session jika ada
-            id_user = 1 
+            id_user = 1  # sementara
             total = sum(item[4] for item in self.cart)
 
             cursor = self.db.cursor()
-            
-            # 1. Insert ke tabel pembelian
-            # Sesuaikan nama kolom dengan database Anda (biasanya ada id_user juga)
+
+            # Insert header pembelian
             cursor.execute(
                 "INSERT INTO pembelian (tanggal, id_supplier, id_user, total) VALUES (%s, %s, %s, %s)",
                 (tanggal, id_supplier, id_user, total)
             )
             id_pembelian = cursor.lastrowid
 
-            # 2. Insert Detail & Update Stok
+            # Insert detail & update stok
             for item in self.cart:
-                # item: (id_produk, nama, harga_beli, qty, subtotal)
                 cursor.execute(
-                    "INSERT INTO detail_pembelian (id_pembelian, id_produk, jumlah, harga_beli, subtotal) VALUES (%s, %s, %s, %s, %s)",
+                    """INSERT INTO detail_pembelian
+                       (id_pembelian, id_produk, jumlah, harga_beli, subtotal)
+                       VALUES (%s, %s, %s, %s, %s)""",
                     (id_pembelian, item[0], item[3], item[2], item[4])
                 )
-                
-                # Update Stok (Tambah)
+
                 self.produk_model.tambah_stok(item[0], item[3])
-                
-                # Opsional: Update harga beli terbaru di master produk
-                cursor.execute("UPDATE produk SET harga_beli=%s WHERE id_produk=%s", (item[2], item[0]))
+                cursor.execute(
+                    "UPDATE produk SET harga_beli=%s WHERE id_produk=%s",
+                    (item[2], item[0])
+                )
 
             self.db.commit()
             QMessageBox.information(self, "Sukses", "Pembelian berhasil disimpan")
             self.reset_cart()
-            self.ui.lineEdit.clear()
 
         except Exception as e:
             self.db.rollback()
-            QMessageBox.critical(self, "Error", f"Gagal simpan pembelian: {e}")
-            print(e)
-
-    def hitung_subtotal(self):
-        try:
-            harga = int(self.ui.input_harga_beli.text() or 0)
-            qty = self.ui.input_jumlah.value()
-            subtotal = harga * qty
-            self.ui.input_subtotal.setText(str(subtotal))
-        except:
-            self.ui.input_subtotal.setText("0")
+            QMessageBox.critical(self, "Error", f"Gagal simpan pembelian\n{e}")

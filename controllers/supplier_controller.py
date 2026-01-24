@@ -6,19 +6,26 @@ from db import get_connection
 MODE_INSERT = "insert"
 MODE_EDIT = "edit"
 
+
 class SupplierController(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
+        # Setup UI
         self.ui = Ui_Form_Supplier()
         self.ui.setupUi(self)
 
+        # State
         self.mode = MODE_INSERT
         self.selected_id = None
 
+        # Init
         self.set_mode(MODE_INSERT)
         self.load_supplier()
+        self.bind_event()
 
-        # Event Connect
+    # ================= EVENT =================
+    def bind_event(self):
         self.ui.btn_Simpan.clicked.connect(self.insert_supplier)
         self.ui.btn_Edit.clicked.connect(self.update_supplier)
         self.ui.btn_Hapus.clicked.connect(self.delete_supplier)
@@ -28,13 +35,13 @@ class SupplierController(QtWidgets.QWidget):
     # ================= MODE =================
     def set_mode(self, mode):
         self.mode = mode
-        if mode == MODE_INSERT:
+        is_insert = mode == MODE_INSERT
+
+        self.ui.btn_Simpan.setEnabled(is_insert)
+        self.ui.btn_Edit.setEnabled(not is_insert)
+
+        if is_insert:
             self.selected_id = None
-            self.ui.btn_Simpan.setEnabled(True)
-            self.ui.btn_Edit.setEnabled(False)
-        else:
-            self.ui.btn_Simpan.setEnabled(False)
-            self.ui.btn_Edit.setEnabled(True)
 
     # ================= LOAD =================
     def load_supplier(self):
@@ -52,17 +59,16 @@ class SupplierController(QtWidgets.QWidget):
                         r, c, QtWidgets.QTableWidgetItem(str(val))
                     )
         except Exception as e:
-            print(f"Error loading supplier: {e}")
+            QMessageBox.critical(self, "Error", str(e))
 
     # ================= SELECT =================
     def select_row(self, row, column):
         self.selected_id = self.ui.tableWidget.item(row, 0).text()
 
         self.ui.input_nama_supplier.setText(self.ui.tableWidget.item(row, 1).text())
-        self.ui.input_telepon.setText(self.ui.tableWidget.item(row, 2).text()) # Perhatikan urutan kolom DB Anda
+        self.ui.input_telepon.setText(self.ui.tableWidget.item(row, 2).text())
         self.ui.input_email.setText(self.ui.tableWidget.item(row, 3).text())
-        # Untuk QTextEdit gunakan setText atau setPlainText
-        self.ui.input_alamat.setText(self.ui.tableWidget.item(row, 4).text()) 
+        self.ui.input_alamat.setPlainText(self.ui.tableWidget.item(row, 4).text())
 
         self.set_mode(MODE_EDIT)
 
@@ -71,14 +77,8 @@ class SupplierController(QtWidgets.QWidget):
         if self.mode != MODE_INSERT:
             return
 
-        nama = self.ui.input_nama_supplier.text().strip()
-        # PERBAIKAN DI SINI: Gunakan toPlainText() untuk QTextEdit
-        alamat = self.ui.input_alamat.toPlainText().strip() 
-        telp = self.ui.input_telepon.text().strip()
-        email = self.ui.input_email.text().strip()
-
-        if not nama or not telp:
-            QMessageBox.warning(self, "Validasi", "Nama & Telepon wajib diisi!")
+        data = self.get_form_data()
+        if not data:
             return
 
         try:
@@ -86,8 +86,8 @@ class SupplierController(QtWidgets.QWidget):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO supplier (nama_supplier, alamat, telp, email)
-                VALUES (%s,%s,%s,%s)
-            """, (nama, alamat, telp, email))
+                VALUES (%s, %s, %s, %s)
+            """, data)
             conn.commit()
             conn.close()
 
@@ -103,14 +103,8 @@ class SupplierController(QtWidgets.QWidget):
             QMessageBox.warning(self, "Peringatan", "Pilih data terlebih dahulu")
             return
 
-        nama = self.ui.input_nama_supplier.text().strip()
-        # PERBAIKAN DI SINI: Gunakan toPlainText() untuk QTextEdit
-        alamat = self.ui.input_alamat.toPlainText().strip()
-        telp = self.ui.input_telepon.text().strip()
-        email = self.ui.input_email.text().strip()
-
-        if not nama or not telp:
-            QMessageBox.warning(self, "Validasi", "Nama & Telepon wajib diisi!")
+        data = self.get_form_data()
+        if not data:
             return
 
         try:
@@ -123,7 +117,7 @@ class SupplierController(QtWidgets.QWidget):
                     telp=%s,
                     email=%s
                 WHERE id_supplier=%s
-            """, (nama, alamat, telp, email, self.selected_id))
+            """, (*data, self.selected_id))
             conn.commit()
             conn.close()
 
@@ -140,7 +134,8 @@ class SupplierController(QtWidgets.QWidget):
             return
 
         confirm = QMessageBox.question(
-            self, "Konfirmasi",
+            self,
+            "Konfirmasi",
             "Yakin ingin menghapus supplier ini?",
             QMessageBox.Yes | QMessageBox.No
         )
@@ -161,6 +156,19 @@ class SupplierController(QtWidgets.QWidget):
                 self.load_supplier()
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
+
+    # ================= HELPER =================
+    def get_form_data(self):
+        nama = self.ui.input_nama_supplier.text().strip()
+        alamat = self.ui.input_alamat.toPlainText().strip()
+        telp = self.ui.input_telepon.text().strip()
+        email = self.ui.input_email.text().strip()
+
+        if not nama or not telp:
+            QMessageBox.warning(self, "Validasi", "Nama & Telepon wajib diisi!")
+            return None
+
+        return nama, alamat, telp, email
 
     # ================= RESET =================
     def reset_form(self):

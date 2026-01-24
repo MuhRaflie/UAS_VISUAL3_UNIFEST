@@ -10,22 +10,30 @@ MODE_EDIT = "edit"
 class ProdukController(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
+        # Setup UI
         self.ui = Ui_Form_produk()
         self.ui.setupUi(self)
 
+        # State
         self.mode = MODE_INSERT
         self.selected_id = None
 
-        self.set_mode(MODE_INSERT)
-        self.load_supplier()
-        self.load_produk()
-
-        # --- PERBAIKAN LAYOUT ---
+        # Layout fix
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self.ui.frame_2)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Button events
+        # Load data awal
+        self.load_supplier()
+        self.load_produk()
+        self.set_mode(MODE_INSERT)
+
+        # Event binding
+        self.bind_event()
+
+    # ================= EVENT =================
+    def bind_event(self):
         self.ui.btn_Simpan.clicked.connect(self.insert_produk)
         self.ui.btn_Edit.clicked.connect(self.update_produk)
         self.ui.btn_Hapus.clicked.connect(self.delete_produk)
@@ -36,18 +44,18 @@ class ProdukController(QtWidgets.QWidget):
     def set_mode(self, mode):
         self.mode = mode
 
-        if mode == MODE_INSERT:
+        is_insert = mode == MODE_INSERT
+        self.ui.btn_Simpan.setEnabled(is_insert)
+        self.ui.btn_Edit.setEnabled(not is_insert)
+
+        if is_insert:
             self.selected_id = None
-            self.ui.btn_Simpan.setEnabled(True)
-            self.ui.btn_Edit.setEnabled(False)
-        else:
-            self.ui.btn_Simpan.setEnabled(False)
-            self.ui.btn_Edit.setEnabled(True)
 
     # ================= LOAD =================
     def load_produk(self):
         conn = get_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
             SELECT p.id_produk,
                    p.nama_produk,
@@ -58,26 +66,28 @@ class ProdukController(QtWidgets.QWidget):
             FROM produk p
             LEFT JOIN supplier s ON p.id_supplier = s.id_supplier
         """)
+
         data = cursor.fetchall()
         conn.close()
 
         self.ui.tableWidget.setRowCount(len(data))
-
-        for r, row in enumerate(data):
-            for c, val in enumerate(row):
+        for row_index, row in enumerate(data):
+            for col_index, value in enumerate(row):
                 self.ui.tableWidget.setItem(
-                    r, c, QtWidgets.QTableWidgetItem(str(val))
+                    row_index,
+                    col_index,
+                    QtWidgets.QTableWidgetItem(str(value))
                 )
 
     def load_supplier(self):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id_supplier, nama_supplier FROM supplier")
-        suppliers = cursor.fetchall()
+        data = cursor.fetchall()
         conn.close()
 
         self.ui.combo_supplier.clear()
-        for sid, nama in suppliers:
+        for sid, nama in data:
             self.ui.combo_supplier.addItem(nama, sid)
 
     # ================= SELECT =================
@@ -101,14 +111,8 @@ class ProdukController(QtWidgets.QWidget):
         if self.mode != MODE_INSERT:
             return
 
-        nama = self.ui.input_nama_produk.text().strip()
-        beli = self.ui.input_harga_beli.text().strip()
-        jual = self.ui.input_harga_jual.text().strip()
-        stok = self.ui.input_stok.text().strip()
-        supplier_id = self.ui.combo_supplier.currentData()
-
-        if not nama or not beli or not jual or not stok:
-            QMessageBox.warning(self, "Validasi", "Semua field wajib diisi!")
+        data = self.get_form_data()
+        if not data:
             return
 
         conn = get_connection()
@@ -116,8 +120,8 @@ class ProdukController(QtWidgets.QWidget):
         cursor.execute("""
             INSERT INTO produk
             (nama_produk, harga_beli, harga_jual, stok, id_supplier)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (nama, beli, jual, stok, supplier_id))
+            VALUES (%s, %s, %s, %s, %s)
+        """, data)
         conn.commit()
         conn.close()
 
@@ -131,14 +135,8 @@ class ProdukController(QtWidgets.QWidget):
             QMessageBox.warning(self, "Peringatan", "Pilih data terlebih dahulu")
             return
 
-        nama = self.ui.input_nama_produk.text().strip()
-        beli = self.ui.input_harga_beli.text().strip()
-        jual = self.ui.input_harga_jual.text().strip()
-        stok = self.ui.input_stok.text().strip()
-        supplier_id = self.ui.combo_supplier.currentData()
-
-        if not nama or not beli or not jual or not stok:
-            QMessageBox.warning(self, "Validasi", "Semua field wajib diisi!")
+        data = self.get_form_data()
+        if not data:
             return
 
         conn = get_connection()
@@ -151,7 +149,7 @@ class ProdukController(QtWidgets.QWidget):
                 stok=%s,
                 id_supplier=%s
             WHERE id_produk=%s
-        """, (nama, beli, jual, stok, supplier_id, self.selected_id))
+        """, (*data, self.selected_id))
         conn.commit()
         conn.close()
 
@@ -166,7 +164,8 @@ class ProdukController(QtWidgets.QWidget):
             return
 
         confirm = QMessageBox.question(
-            self, "Konfirmasi",
+            self,
+            "Konfirmasi",
             "Yakin ingin menghapus produk ini?",
             QMessageBox.Yes | QMessageBox.No
         )
@@ -184,6 +183,20 @@ class ProdukController(QtWidgets.QWidget):
             QMessageBox.information(self, "Sukses", "Produk berhasil dihapus")
             self.reset_form()
             self.load_produk()
+
+    # ================= HELPER =================
+    def get_form_data(self):
+        nama = self.ui.input_nama_produk.text().strip()
+        beli = self.ui.input_harga_beli.text().strip()
+        jual = self.ui.input_harga_jual.text().strip()
+        stok = self.ui.input_stok.text().strip()
+        supplier_id = self.ui.combo_supplier.currentData()
+
+        if not all([nama, beli, jual, stok]):
+            QMessageBox.warning(self, "Validasi", "Semua field wajib diisi!")
+            return None
+
+        return nama, beli, jual, stok, supplier_id
 
     # ================= RESET =================
     def reset_form(self):
