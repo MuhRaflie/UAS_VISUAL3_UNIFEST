@@ -11,7 +11,10 @@ class PembelianController(QWidget):
         self.db = db
         self.produk_model = ProdukModel(db)
         self.cart = [] # (id_produk, nama, harga_beli, qty, subtotal)
-
+        self.ui.combo_produk.currentIndexChanged.connect(self.set_harga_otomatis)
+        self.ui.input_jumlah.valueChanged.connect(self.hitung_subtotal)
+        self.ui.input_harga_beli.setReadOnly(True)
+        self.ui.input_subtotal.setReadOnly(True)
         # Load Data
         self.load_supplier()
         self.load_produk()
@@ -47,6 +50,13 @@ class PembelianController(QWidget):
                 self.ui.combo_produk.addItem(f"{row[1]}", row)
         except Exception as e:
             print(f"Error load produk: {e}")
+
+    def set_harga_otomatis(self):
+        produk_data = self.ui.combo_produk.currentData()
+        if produk_data:
+            harga_beli = produk_data[2]  # dari SELECT id, nama, harga_beli
+            self.ui.input_harga_beli.setText(str(harga_beli))
+            self.hitung_subtotal()
 
     def tambah_item(self):
         try:
@@ -152,3 +162,12 @@ class PembelianController(QWidget):
             self.db.rollback()
             QMessageBox.critical(self, "Error", f"Gagal simpan pembelian: {e}")
             print(e)
+
+    def hitung_subtotal(self):
+        try:
+            harga = int(self.ui.input_harga_beli.text() or 0)
+            qty = self.ui.input_jumlah.value()
+            subtotal = harga * qty
+            self.ui.input_subtotal.setText(str(subtotal))
+        except:
+            self.ui.input_subtotal.setText("0")

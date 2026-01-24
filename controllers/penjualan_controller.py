@@ -10,11 +10,13 @@ class PenjualanController(QWidget):
         super().__init__()
         self.ui = Ui_Form()
         self.ui.setupUi(self)
-
+        
         self.db = db
         self.model = PenjualanModel(db)
         self.produk_model = ProdukModel(db)
         self.cart = []
+        self.ui.input_harga_jual.setReadOnly(True)
+        self.ui.input_subtotal.setReadOnly(True)
 
         # resize tabel
         self.ui.table_detail_penjualan.horizontalHeader().setSectionResizeMode(
