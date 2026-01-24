@@ -19,6 +19,7 @@ class DashboardController(QMainWindow):
         self.db = get_connection()
         self.child_window = None
         self.bind_event()
+        self.load_dashboard()
 
     def bind_event(self):
         self.ui.btn_customer.clicked.connect(self.open_customer)
@@ -56,4 +57,40 @@ class DashboardController(QMainWindow):
         self.form = PembelianController(self.db)
         self.form.show()
 
+    def load_dashboard(self):
+        try:
+            cursor = self.db.cursor()
+
+            # Total transaksi penjualan
+            cursor.execute("SELECT COUNT(*) FROM penjualan")
+            total_penjualan = cursor.fetchone()[0]
+
+            # Total produk
+            cursor.execute("SELECT COUNT(*) FROM produk")
+            total_produk = cursor.fetchone()[0]
+
+            # Total stok
+            cursor.execute("SELECT SUM(stok) FROM produk")
+            total_stok = cursor.fetchone()[0] or 0
+
+            # Total pendapatan
+            cursor.execute("SELECT SUM(total) FROM penjualan")
+            total_pendapatan = cursor.fetchone()[0] or 0
+
+            # SET KE LABEL UI (INI PENTING)
+            self.ui.lbl_summary_penjualan.setText(
+                f"penjualan : {total_penjualan} transaksi"
+            )
+            self.ui.lbl_summary_produk.setText(
+                f"produk : {total_produk} item"
+            )
+            self.ui.lbl_summary_stok.setText(
+                f"stok : {total_stok} unit"
+            )
+            self.ui.lbl_summary_pendapatan.setText(
+                f"pendapatan : Rp {total_pendapatan:,.0f}"
+            )
+
+        except Exception as e:
+            print("Error load dashboard:", e)
 
